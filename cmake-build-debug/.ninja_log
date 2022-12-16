@@ -1,0 +1,6 @@
+# ninja log v5
+8	3267	6928736901087449	CMakeFiles/mat.dir/src/matrix_impl.cpp.obj	6d4c74f686d09a00
+4	3914	6928851784633176	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
+3915	4158	6928851787157456	mat.exe	cddfa5b440e01e01
+5	2489	6928970589605211	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
+2489	2644	6928970591111254	mat.exe	cddfa5b440e01e01
