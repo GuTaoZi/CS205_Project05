@@ -2,6 +2,11 @@
 
 #include <cstdio>
 
+template<typename T1, typename T2>
+T1 default_convert(T2 src)
+{
+    return (T1) src;
+}
 
 template<typename Tp>
 class data
@@ -39,6 +44,9 @@ public:
 
     //! override assign operator
     data<Tp> &operator=(const data &p);
+
+    template<typename target_type>
+    data<target_type> convert_to(target_type (*convert_function)(Tp src) = default_convert<target_type, Tp>) const;
 
     //! override equation(strict equal)
     bool operator==(const data &p) const;
@@ -169,4 +177,16 @@ bool data<Tp>::equals(const data &p, bool (*equal)(Tp, Tp)) const
         }
     }
     return true;
+}
+
+template<typename Tp>
+template<typename target_type>
+data<target_type> data<Tp>::convert_to(target_type (*convert_function)(Tp)) const
+{
+    target_type *New = new target_type[length]{};
+    for (size_t i = 0; i < length; i++)
+    {
+        New[i] = convert_function(value[i]);
+    }
+    return data<target_type>(New, length);
 }

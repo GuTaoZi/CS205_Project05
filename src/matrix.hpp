@@ -5,16 +5,10 @@
 #include <stdexcept>
 #include "data.hpp"
 
-template<typename T1, typename T2>
-T1 default_convert(T2 src)
-{
-    return (T1) src;
-}
-
 template<typename Tp>
 class matrix
 {
-private:
+public:
     typedef char channel_number;
     static int cnt;
     size_t rows;
@@ -25,7 +19,6 @@ private:
     size_t shift;
     data<Tp> *dat;
 
-public:
     int id;
 
     //! constructor that sets matrix elements to given source data
@@ -35,7 +28,7 @@ public:
     matrix(size_t rows, size_t cols, const Tp &value, channel_number channels = 1);
 
     //! submatrix constructor
-    matrix(const matrix &src, size_t row1, size_t col1, size_t row2, size_t col2);
+    matrix(matrix &src, size_t row1, size_t col1, size_t row2, size_t col2);
 
     //! copy constructor (soft copy)
     matrix(const matrix &p);
@@ -45,6 +38,8 @@ public:
 
     bool copy_to(matrix &dst);
 
+    matrix<Tp> split_channel(channel_number channel_id);
+
     //! get element from matrix (read only)
     Tp at(size_t row, size_t col, channel_number channel = 1) const;
 
@@ -53,7 +48,7 @@ public:
 
     //customized type conversion
     template<typename target_type>
-    matrix<target_type> convert_to(target_type (*convert_function)(Tp src) = default_convert) const;
+    matrix<target_type> convert_to(target_type (*convert_function)(Tp src) = default_convert<target_type, Tp>) const;
 
     //! get element from matrix
     Tp &operator()(size_t row, size_t col, channel_number channel = 1) const;
@@ -64,20 +59,27 @@ public:
     //! override equation(strict equal)
     bool operator==(const matrix &p) const;
 
-    template<typename augendtype>
-    matrix<decltype()>
+    template<typename T2>
+    matrix<decltype(Tp() + T2())> operator+(matrix<T2> &p);
+
+    template<typename T2>
+    matrix<decltype(Tp() - T2())> operator-(matrix<T2> &p);
+
+    template<typename T2>
+    matrix<decltype(Tp() * T2())> operator*(matrix<T2> &p);
 
     ~matrix();
 };
 
 template<> int matrix<int>::cnt = 0;
 template<> int matrix<float>::cnt = 0;
+template<> int matrix<double>::cnt = 0;
 
 //! constructor that sets matrix elements to given source data
 template<typename Tp>
-matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels)
+matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels):rows(rows), cols(cols),
+                                                                               channels(channels)
 {
-    id = ++cnt;
     if (rows * cols == 0)
     {
         throw std::invalid_argument("Invalid argument exception: row number and column number should be positive.\n");
@@ -86,12 +88,10 @@ matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels)
     {
         throw std::invalid_argument("Invalid argument exception: channel number should be in [1,4].\n");
     }
+    id = ++cnt;
     this->shift = 0;
-    this->rows = rows;
-    this->cols = cols;
     this->step = cols;
     this->channel_pad = rows * cols;
-    this->channels = channels;
     this->dat = new data<Tp>(src, rows * cols * channels);
 }
 
@@ -101,20 +101,21 @@ matrix<Tp>::matrix(size_t rows, size_t cols, const Tp &value, channel_number cha
                                                                                        channels(channels)
 {
     id = ++cnt;
-    shift = 0;
-    step = cols;
-    channel_pad = rows * cols;
     size_t length = rows * cols * channels;
-    dat = new data<Tp>(length);
+    Tp *src = new Tp[length]{};
     for (size_t i = 0; i < length; i++)
     {
-        this->dat[i] = value;
+        src[i] = value;
     }
+    this->shift = 0;
+    this->step = cols;
+    this->channel_pad = rows * cols;
+    this->dat = new data<Tp>(src, rows * cols * channels);
 }
 
 //! submatrix constructor
 template<typename Tp>
-matrix<Tp>::matrix(const matrix &src, size_t row1, size_t col1, size_t row2, size_t col2)
+matrix<Tp>::matrix(matrix &src, size_t row1, size_t col1, size_t row2, size_t col2)
 {
     id = ++cnt;
     rows = row2 - row1 + 1;
@@ -186,6 +187,15 @@ bool matrix<Tp>::copy_to(matrix &dst)
 }
 
 template<typename Tp>
+matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
+{
+    matrix<Tp> New(*this);
+    New.channels = 1;
+    New.shift += channel_pad * (channel_id - 1);
+    return New;
+}
+
+template<typename Tp>
 matrix<Tp> &matrix<Tp>::operator=(const matrix &p)
 {
     if (this == &p)
@@ -199,6 +209,10 @@ matrix<Tp> &matrix<Tp>::operator=(const matrix &p)
     step = p.step;
     shift = p.shift;
     channel_pad = p.channel_pad;
+    if (dat != p.dat)
+    {
+        dat->dec_ref_count();
+    }
     dat = p.dat;
     dat->inc_ref_count();
     return (*this);
@@ -263,7 +277,7 @@ template<typename Tp>
 template<typename target_type>
 matrix<target_type> matrix<Tp>::convert_to(target_type (*convert_function)(Tp src)) const
 {
-    auto *NewArr = new target_type[rows * cols * channels]{};
+    target_type *NewArr = new target_type[rows * cols * channels]{};
     size_t it = 0;
     for (char ch = 1; ch <= channels; ch++)
     {
@@ -276,4 +290,67 @@ matrix<target_type> matrix<Tp>::convert_to(target_type (*convert_function)(Tp sr
         }
     }
     return matrix<target_type>(rows, cols, NewArr, channels);
+}
+
+template<typename T1>
+template<typename T2>
+matrix<decltype(T1() + T2())> matrix<T1>::operator+(matrix<T2> &p)
+{
+    typedef decltype(T1() + T2()) result_type;
+    result_type *NewArr = new result_type[rows * cols * channels]{};
+    size_t it = 0;
+    for (char ch = 1; ch <= channels; ch++)
+    {
+        for (size_t r = 1; r <= rows; r++)
+        {
+            for (size_t c = 1; c <= cols; c++)
+            {
+                NewArr[it++] = at(r, c, ch) + p.at(r, c, ch);
+            }
+        }
+    }
+    return matrix<result_type>(rows, cols, NewArr, channels);
+}
+
+template<typename T1>
+template<typename T2>
+matrix<decltype(T1() - T2())> matrix<T1>::operator-(matrix<T2> &p)
+{
+    typedef decltype(T1() - T2()) result_type;
+    result_type *NewArr = new result_type[rows * cols * channels]{};
+    size_t it = 0;
+    for (char ch = 1; ch <= channels; ch++)
+    {
+        for (size_t r = 1; r <= rows; r++)
+        {
+            for (size_t c = 1; c <= cols; c++)
+            {
+                NewArr[it++] = at(r, c, ch) - p.at(r, c, ch);
+            }
+        }
+    }
+    return matrix<result_type>(rows, cols, NewArr, channels);
+}
+
+template<typename T1>
+template<typename T2>
+matrix<decltype(T1() * T2())> matrix<T1>::operator*(matrix<T2> &p)
+{
+    typedef decltype(T1() * T2()) result_type;
+    result_type *NewArr = new result_type[rows * cols * channels]{};
+    matrix<result_type> New(rows, cols, NewArr, channels);
+    for (char ch = 1; ch <= channels; ch++)
+    {
+        for (size_t i = 1; i <= rows; i++)
+        {
+            for (size_t k = 1; k <= cols; k++)
+            {
+                for (size_t j = 1; j <= p.cols; j++)
+                {
+                    New(i, j) = New(i, j) + at(i, k) * p.at(k, j);
+                }
+            }
+        }
+    }
+    return New;
 }
