@@ -1,11 +1,4 @@
 # ninja log v5
 8	3267	6928736901087449	CMakeFiles/mat.dir/src/matrix_impl.cpp.obj	6d4c74f686d09a00
-3	2064	6929103663881490	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
-2064	2201	6929103665075153	mat.exe	cddfa5b440e01e01
-3	2293	6929103772608034	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
-2294	2420	6929103773843973	mat.exe	cddfa5b440e01e01
-3	2275	6929115716663179	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
-2	2360	6929117894251940	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
-3	1663	6929119538175170	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
-3	2167	6929120248799545	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
-2167	2290	6929120250053680	mat.exe	cddfa5b440e01e01
+3	1460	6929483810479604	CMakeFiles/mat.dir/src/benchmark.cpp.obj	43d0767eb7f18f76
+1460	1574	6929483811579120	mat.exe	cddfa5b440e01e01

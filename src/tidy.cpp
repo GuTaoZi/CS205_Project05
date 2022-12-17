@@ -11,15 +11,17 @@ class matrix
 private:
     typedef matrix<bool> mask;
     typedef char channel_number;
+
     size_t rows;
     size_t cols;
+    //number of channels should be [1,4]
     channel_number channels;
+    //padding of relative position
     size_t channel_pad;
     size_t step;
     size_t shift;
     data<Tp> *dat;
 public:
-
     //! constructor that sets matrix elements to given source data
     matrix(size_t rows, size_t cols, Tp *src, channel_number channels = 1);
 
@@ -32,43 +34,47 @@ public:
     //! copy constructor (soft copy)
     matrix(const matrix &p);
 
-    //! hard copy
-    matrix<int> clone();
-
-    bool copy_to(matrix &dst);
-
-    bool copy_to(matrix &dst, const mask &mask);
-
-    matrix<Tp> split_channel(channel_number channel_id);
-
-    //! get element from matrix (read only)
-    Tp at(size_t row, size_t col, channel_number channel = 1) const;
-
-    bool set(size_t row, size_t col, const Tp &value, channel_number channel = 1);
-
-    bool fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel = 1);
-
-    //! equal with customized compare function
-    bool equals(const matrix &p, bool (*equal)(Tp, Tp)) const;
-
-    //customized type conversion
-    template<typename target_type>
-    matrix<target_type> convert_to(target_type (*convert_function)(Tp src) = default_convert<target_type, Tp>) const;
-
-    //! get element from matrix
-    Tp &operator()(size_t row, size_t col, channel_number channel = 1) const;
+    //! override same type assign operator(soft copy)
+    matrix<Tp> &operator=(const matrix<Tp> &p);
 
     //! override implicit type transform assign operator(convert & hard copy)
     template<typename rhs>
     matrix<Tp> &operator=(const matrix<rhs> &p);
 
-    //! override same type assign operator(soft copy)
-    matrix<Tp> &operator=(const matrix<Tp> &p);
+    //! hard copy functions
+    matrix<int> clone();
+
+    bool copy_to(matrix &dst);
+
+    //! ROI using mask(matrix<bool>)
+    bool copy_to(matrix &dst, const mask &mask);
+
+    //! split out a single channel
+    matrix<Tp> split_channel(channel_number channel_id);
+
+    //! get element from matrix (read only)
+    Tp at(size_t row, size_t col, channel_number channel = 1) const;
+
+    //! get element reference from matrix
+    Tp &operator()(size_t row, size_t col, channel_number channel = 1) const;
+
+    //! set a single element to a given value
+    bool set(size_t row, size_t col, const Tp &value, channel_number channel = 1);
+
+    //! fill the given region with a given value
+    bool fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel = 1);
+
+    //! equal with customized compare function
+    bool equals(const matrix &p, bool (*equal)(Tp, Tp)) const;
 
     //! override equation(strict equal)
     bool operator==(const matrix &p) const;
 
-    //basic calculation
+    //customized type conversion
+    template<typename target_type>
+    matrix<target_type> convert_to(target_type (*convert_function)(Tp src) = default_convert<target_type, Tp>) const;
+
+    //basic calculations
     template<typename T2>
     matrix<decltype(Tp() + T2())> operator+(matrix<T2> &p);
 
@@ -78,7 +84,7 @@ public:
     template<typename T2>
     matrix<decltype(Tp() * T2())> operator*(matrix<T2> &p);
 
-    //customized calculation
+    //customized element-wise calculation
     template<typename result_type>
     matrix<result_type> unary_calc(result_type (*unary_function)(Tp)) const;
 
@@ -87,6 +93,7 @@ public:
 
     ~matrix();
 
+    //getters for access between different type of template class
     size_t get_rows() const;
 
     size_t get_cols() const;
@@ -165,25 +172,41 @@ matrix<Tp>::matrix(const matrix &p)
     dat->inc_ref_count();
 }
 
+//! override same type assign operator(soft copy)
 template<typename Tp>
-Tp &matrix<Tp>::operator()(size_t row, size_t col, channel_number channel) const
+matrix<Tp> &matrix<Tp>::operator=(const matrix<Tp> &p)
 {
-    return (*dat)[shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1];
+    if (this == &p)
+    {
+        return (*this);
+    }
+    rows = p.get_rows();
+    cols = p.get_cols();
+    channels = p.get_channels();
+    step = p.get_step();
+    shift = p.get_shift();
+    channel_pad = p.get_channel_pad();
+    if (dat != p.get_dat())
+    {
+        dat->dec_ref_count();
+    }
+    dat = p.get_dat();
+    dat->inc_ref_count();
 }
 
-template<typename Tp>
-Tp matrix<Tp>::at(size_t row, size_t col, channel_number channel) const
-{
-    return (*dat)[shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1];
-}
+//! override implicit type transform assign operator(convert & hard copy)
 
 template<typename Tp>
-matrix<Tp>::~matrix()
+template<typename rhs>
+matrix<Tp> &matrix<Tp>::operator=(const matrix<rhs> &p)
 {
     dat->dec_ref_count();
+    (*this) = p.template convert_to<Tp>();
+    return (*this);
 }
 
-//! hard copy
+//! hard copy functions
+
 template<typename Tp>
 matrix<int> matrix<Tp>::clone()
 {
@@ -210,6 +233,32 @@ bool matrix<Tp>::copy_to(matrix &dst)
     return true;
 }
 
+//! ROI using mask(matrix<bool>)
+template<typename Tp>
+bool matrix<Tp>::copy_to(matrix &dst, const matrix::mask &mask)
+{
+    dst.~matrix();
+    Tp *NewArr = new Tp[rows * cols * channels]{};
+    size_t it = 0;
+    for (channel_number ch = 1; ch <= channels; ch++)
+    {
+        for (size_t r = 1; r <= rows; r++)
+        {
+            for (size_t c = 1; c <= cols; c++)
+            {
+                it++;
+                if (mask(r, c, ch))
+                {
+                    NewArr[it] = at(r, c, ch);
+                }
+            }
+        }
+    }
+    dst = matrix<Tp>(rows, cols, NewArr, channels);
+    return true;
+}
+
+//! split out a single channel
 template<typename Tp>
 matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
 {
@@ -219,36 +268,71 @@ matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
     return New;
 }
 
+//! get element from matrix (read only)
 template<typename Tp>
-template<typename rhs>
-matrix<Tp> &matrix<Tp>::operator=(const matrix<rhs> &p)
+Tp matrix<Tp>::at(size_t row, size_t col, channel_number channel) const
 {
-    dat->dec_ref_count();
-    (*this) = p.template convert_to<Tp>();
-    return (*this);
+    return (*dat)[shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1];
 }
 
+//! get element reference from matrix
 template<typename Tp>
-matrix<Tp> &matrix<Tp>::operator=(const matrix<Tp> &p)
+Tp &matrix<Tp>::operator()(size_t row, size_t col, channel_number channel) const
+{
+    return (*dat)[shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1];
+}
+
+//! set a single element to a given value
+template<typename Tp>
+bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, matrix::channel_number channel)
+{
+    (*this)(row, col, channels) = value;
+    return true;
+}
+
+//! fill the given region with a given value
+template<typename Tp>
+bool matrix<Tp>::fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel)
+{
+    for (size_t r = row1; r <= row2; r++)
+    {
+        for (size_t c = col1; c <= col2; c++)
+        {
+            (*this)(r, c, channel) = value;
+        }
+    }
+    return true;
+}
+
+//! equal with customized compare function
+template<typename Tp>
+bool matrix<Tp>::equals(const matrix &p, bool (*equal)(Tp, Tp)) const
 {
     if (this == &p)
     {
-        return (*this);
+        return true;
     }
-    rows = p.get_rows();
-    cols = p.get_cols();
-    channels = p.get_channels();
-    step = p.get_step();
-    shift = p.get_shift();
-    channel_pad = p.get_channel_pad();
-    if (dat != p.get_dat())
+    if (rows != p.get_rows() || cols != p.get_cols() || channels != p.get_channels())
     {
-        dat->dec_ref_count();
+        return false;
     }
-    dat = p.get_dat();
-    dat->inc_ref_count();
+    for (channel_number ch = 1; ch <= channels; ch++)
+    {
+        for (size_t r = 1; r <= rows; r++)
+        {
+            for (size_t c = 1; c <= cols; c++)
+            {
+                if (!equal(at(r, c, ch), p.at(r, c, ch)))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
+//! override equation(strict equal)
 template<typename Tp>
 bool matrix<Tp>::operator==(const matrix &p) const
 {
@@ -277,33 +361,7 @@ bool matrix<Tp>::operator==(const matrix &p) const
     return true;
 }
 
-template<typename Tp>
-bool matrix<Tp>::equals(const matrix &p, bool (*equal)(Tp, Tp)) const
-{
-    if (this == &p)
-    {
-        return true;
-    }
-    if (rows != p.get_rows() || cols != p.get_cols() || channels != p.get_channels())
-    {
-        return false;
-    }
-    for (channel_number ch = 1; ch <= channels; ch++)
-    {
-        for (size_t r = 1; r <= rows; r++)
-        {
-            for (size_t c = 1; c <= cols; c++)
-            {
-                if (!equal(at(r, c, ch), p.at(r, c, ch)))
-                {
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
-}
-
+//customized type conversion
 template<typename Tp>
 template<typename target_type>
 matrix<target_type> matrix<Tp>::convert_to(target_type (*convert_function)(Tp src)) const
@@ -323,6 +381,7 @@ matrix<target_type> matrix<Tp>::convert_to(target_type (*convert_function)(Tp sr
     return matrix<target_type>(rows, cols, NewArr, channels);
 }
 
+//basic calculations
 template<typename T1>
 template<typename T2>
 matrix<decltype(T1() + T2())> matrix<T1>::operator+(matrix<T2> &p)
@@ -386,6 +445,7 @@ matrix<decltype(T1() * T2())> matrix<T1>::operator*(matrix<T2> &p)
     return New;
 }
 
+//customized element-wise calculation
 template<typename Tp>
 template<typename result_type>
 matrix<result_type> matrix<Tp>::unary_calc(result_type (*unary_function)(Tp)) const
@@ -424,50 +484,7 @@ matrix<result_type> matrix<Tp>::binary_calc(const matrix<T2> &p, result_type (*b
     return matrix<result_type>(rows, cols, NewArr, channels);
 }
 
-template<typename Tp>
-bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, matrix::channel_number channel)
-{
-    (*this)(row, col, channels) = value;
-    return true;
-}
-
-template<typename Tp>
-bool matrix<Tp>::copy_to(matrix &dst, const matrix::mask &mask)
-{
-    dst.~matrix();
-    Tp *NewArr = new Tp[rows * cols * channels]{};
-    size_t it = 0;
-    for (channel_number ch = 1; ch <= channels; ch++)
-    {
-        for (size_t r = 1; r <= rows; r++)
-        {
-            for (size_t c = 1; c <= cols; c++)
-            {
-                it++;
-                if (mask(r, c, ch))
-                {
-                    NewArr[it] = at(r, c, ch);
-                }
-            }
-        }
-    }
-    dst = matrix<Tp>(rows, cols, NewArr, channels);
-    return true;
-}
-
-template<typename Tp>
-bool matrix<Tp>::fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel)
-{
-    for (size_t r = row1; r <= row2; r++)
-    {
-        for (size_t c = col1; c <= col2; c++)
-        {
-            (*this)(r, c, channel) = value;
-        }
-    }
-    return true;
-}
-
+//getters for access between different type of template class
 template<typename Tp>
 size_t matrix<Tp>::get_rows() const
 {

@@ -55,6 +55,12 @@ build CMakeFiles/mat.dir/src/benchmark.cpp.obj: CXX_COMPILER__mat_Debug E$:/Cpp/
   OBJECT_DIR = CMakeFiles\mat.dir
   OBJECT_FILE_DIR = CMakeFiles\mat.dir\src
 
+build CMakeFiles/mat.dir/src/tidy.cpp.obj: CXX_COMPILER__mat_Debug E$:/Cpp/Project05/src/tidy.cpp || cmake_object_order_depends_target_mat
+  DEP_FILE = CMakeFiles\mat.dir\src\tidy.cpp.obj.d
+  FLAGS = -g
+  OBJECT_DIR = CMakeFiles\mat.dir
+  OBJECT_FILE_DIR = CMakeFiles\mat.dir\src
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target mat
@@ -63,7 +69,7 @@ build CMakeFiles/mat.dir/src/benchmark.cpp.obj: CXX_COMPILER__mat_Debug E$:/Cpp/
 #############################################
 # Link the executable mat.exe
 
-build mat.exe: CXX_EXECUTABLE_LINKER__mat_Debug CMakeFiles/mat.dir/src/benchmark.cpp.obj
+build mat.exe: CXX_EXECUTABLE_LINKER__mat_Debug CMakeFiles/mat.dir/src/benchmark.cpp.obj CMakeFiles/mat.dir/src/tidy.cpp.obj
   FLAGS = -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\mat.dir
