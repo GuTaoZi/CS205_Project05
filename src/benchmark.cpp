@@ -43,12 +43,12 @@ int main()
     matrix<int> sp1 = m.split_channel(1).convert_to(Round);
     matrix<float> sp2 = m.split_channel(2);
     matrix<float> sp3 = m.split_channel(3);
-    sp3 = sp3 + sp1;
-    sp3 = sp3 * sp2;
+    sp3 += sp1;
     matrix<double> sp4(4, 4, 1);
     sp4 = sp4.unary_calc(Round);
     sp4.fill(1, 2, 4, 4, 0);
-    sp3 = sp1 * sp4;
+    sp3 = sp1* sp4;
+    sp3=sp3.transpose();
     for (int i = 1; i <= 4; i++)
     {
         for (int j = 1; j <= 4; j++)

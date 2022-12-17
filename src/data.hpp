@@ -1,15 +1,12 @@
 #pragma once
 
 #include <cstdio>
-#include <iostream>
 
 template<typename T1, typename T2>
 T1 default_convert(T2 src)
 {
     return (T1) src;
 }
-
-int cnt = 0;
 
 template<typename Tp>
 class data
@@ -19,8 +16,6 @@ private:
     size_t length{};
     int *ref_count{};
 public:
-    int id;
-
     //! constructor using the given source data
     explicit data(Tp *dat, size_t length);
 
@@ -34,9 +29,6 @@ public:
     data<Tp> clone();
 
     bool copy_to(data &dst);
-
-    //destructor
-    ~data();
 
     //! increase refcount
     void inc_ref_count();
@@ -55,30 +47,28 @@ public:
 
     //! equal with customized compare function
     bool equals(const data &p, bool (*equal)(Tp, Tp)) const;
+
+    //! destructor
+    ~data();
 };
 
 #ifdef SAFE
+
+//! constructor using the given source data
 template<typename Tp>
 data<Tp>::data(Tp *dat, size_t length)
 {
-    id = ++cnt;
-    try
+    if (dat == NULL || dat == nullptr)
     {
-        if (dat == NULL || dat == nullptr)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-        this->length = length;
-        this->value = dat;
-        this->ref_count = new int[1]{1};
+        throw std::invalid_argument(
+                "Null Pointer Exception: The source pointer is null, data construction interrupted.\n");
     }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The source pointer is null, data construction interrupted.\n";
-        abort();
-    }
+    this->length = length;
+    this->value = dat;
+    this->ref_count = new int[1]{1};
 }
 
+//! constructor that malloc new memory of the given length
 template<typename Tp>
 data<Tp>::data(size_t length):length(length)
 {
@@ -90,244 +80,11 @@ data<Tp>::data(size_t length):length(length)
     catch (std::bad_alloc &e)
     {
         std::cerr << "Bad Alloc Exception: Failed to allocate memory of the given length " << length << "\n";
-        abort();
+        throw std::bad_alloc();
     }
 }
 
-template<typename Tp>
-data<Tp>::~data()
-{
-    try
-    {
-        if (value == NULL || value == nullptr)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-        delete[] value;
-        value = nullptr;
-    }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The value pointer is null, data destruction interrupted.\n";
-    }
-}
-
-template<typename Tp>
-void data<Tp>::inc_ref_count()
-{
-    (*ref_count)++;
-}
-
-template<typename Tp>
-void data<Tp>::dec_ref_count()
-{
-    (*ref_count)--;
-    if (!(*ref_count))
-    {
-        this->~data();
-    }
-}
-
-template<typename Tp>
-data<Tp>::data(const data &p)
-{
-    try
-    {
-        length = p.length;
-        delete[]value;
-        value = p.value;
-        delete[]ref_count;
-        ref_count = p.ref_count;
-        if (value == NULL || value == nullptr || ref_count == nullptr || ref_count == NULL)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-    }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The copy source pointer is null, copy construction interrupted.\n";
-        abort();
-    }
-}
-
-template<typename Tp>
-data<Tp> data<Tp>::clone()
-{
-    data<Tp> New(value, length);
-    New.ref_count = new size_t[1]{1};
-    return New;
-}
-
-template<typename Tp>
-bool data<Tp>::copy_to(data &dst)
-{
-    dst.~data();
-    dst = clone();
-    return true;
-}
-
-template<typename Tp>
-Tp &data<Tp>::operator[](size_t i) const
-{
-    try
-    {
-        if (value == NULL || value == nullptr)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-        if (i >= length)
-        {
-            throw std::out_of_range("Out Of Range Exception");
-        }
-        return value[i];
-    }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The value pointer is null, failed to get value[ " << i << " ].\n";
-        abort();
-    }
-    catch (std::out_of_range &e)
-    {
-        std::cerr << e.what() << ": The index " << i << " exceeds the max length of value.\n";
-        abort();
-    }
-}
-
-template<typename Tp>
-data<Tp> &data<Tp>::operator=(const data &p)
-{
-    if (this == &p)
-    {
-        return (*this);
-    }
-    try
-    {
-        if (p.value == NULL || p.value == nullptr)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-        length = p.length;
-        ref_count = p.ref_count;
-        value = p.value;
-        return (*this);
-    }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The value pointer is null, assignment interrupted.\n";
-        abort();
-    }
-}
-
-template<typename Tp>
-bool data<Tp>::operator==(const data &p) const
-{
-    if (this == &p)
-    {
-        return true;
-    }
-    try
-    {
-        if (length != p.length)
-        {
-            return false;
-        }
-        if (value == NULL || value == nullptr || p.value == NULL || p.value == nullptr)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-        for (size_t i = 0; i < length; i++)
-        {
-            if (value[i] != p[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The value pointer is null, assignment interrupted.\n";
-        abort();
-    }
-}
-
-template<typename Tp>
-bool data<Tp>::equals(const data &p, bool (*equal)(Tp, Tp)) const
-{
-    if (this == &p)
-    {
-        return true;
-    }
-    try
-    {
-        if (length != p.length)
-        {
-            return false;
-        }
-        if (value == NULL || value == nullptr || p.value == NULL || p.value == nullptr)
-        {
-            throw std::invalid_argument("Null Pointer Exception");
-        }
-        for (size_t i = 0; i < length; i++)
-        {
-            if (!equal(value[i], p[i]))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-    catch (std::invalid_argument &e)
-    {
-        std::cerr << e.what() << ": The value pointer is null, assignment interrupted.\n";
-        abort();
-    }
-}
-#else
-
-template<typename Tp>
-data<Tp>::data(Tp *dat, size_t length)
-{
-    this->length = length;
-    this->value = dat;
-    this->ref_count = new int[1]{1};
-}
-
-template<typename Tp>
-data<Tp>::data(size_t length):length(length)
-{
-    value = new Tp[length];
-    ref_count = new int[1]{1};
-}
-
-template<typename Tp>
-data<Tp>::~data()
-{
-    if (value == NULL || value == nullptr)
-    {
-        throw std::invalid_argument("Null Pointer Exception");
-    }
-    delete[] value;
-    value = nullptr;
-
-}
-
-template<typename Tp>
-void data<Tp>::inc_ref_count()
-{
-    (*ref_count)++;
-}
-
-template<typename Tp>
-void data<Tp>::dec_ref_count()
-{
-    (*ref_count)--;
-    if (!(*ref_count))
-    {
-        this->~data();
-    }
-}
-
+//! soft copy constructor
 template<typename Tp>
 data<Tp>::data(const data &p)
 {
@@ -338,10 +95,12 @@ data<Tp>::data(const data &p)
     ref_count = p.ref_count;
     if (value == NULL || value == nullptr || ref_count == nullptr || ref_count == NULL)
     {
-        throw std::invalid_argument("Null Pointer Exception");
+        throw std::invalid_argument(
+                "Null Pointer Exception: The copy source pointer is null, copy construction interrupted.\n");
     }
 }
 
+//! hard copy
 template<typename Tp>
 data<Tp> data<Tp>::clone()
 {
@@ -358,12 +117,195 @@ bool data<Tp>::copy_to(data &dst)
     return true;
 }
 
+//! increase refcount
+template<typename Tp>
+void data<Tp>::inc_ref_count()
+{
+    (*ref_count)++;
+}
+
+//! decrease refcount
+template<typename Tp>
+void data<Tp>::dec_ref_count()
+{
+    (*ref_count)--;
+    if (!(*ref_count))
+    {
+        this->~data();
+    }
+}
+
+//! override []
+template<typename Tp>
+Tp &data<Tp>::operator[](size_t i) const
+{
+    if (value == NULL || value == nullptr)
+    {
+        throw std::invalid_argument("Null Pointer Exception: The value pointer is null, failed to get value.\n");
+    }
+    if (i >= length)
+    {
+        throw std::out_of_range("Out Of Range Exception: The index exceeds the max length of value.\n");
+    }
+    return value[i];
+}
+
+//! override assign operator
+template<typename Tp>
+data<Tp> &data<Tp>::operator=(const data &p)
+{
+    if (this == &p)
+    {
+        return (*this);
+    }
+    if (p.value == NULL || p.value == nullptr)
+    {
+        throw std::invalid_argument("Null Pointer Exception: The value pointer is null, assignment interrupted.\n");
+    }
+    length = p.length;
+    ref_count = p.ref_count;
+    value = p.value;
+    return (*this);
+}
+
+//! override equation(strict equal)
+template<typename Tp>
+bool data<Tp>::operator==(const data &p) const
+{
+    if (this == &p)
+    {
+        return true;
+    }
+    if (length != p.length)
+    {
+        return false;
+    }
+    if (value == NULL || value == nullptr || p.value == NULL || p.value == nullptr)
+    {
+        throw std::invalid_argument("Null Pointer Exception: The value pointer is null, assignment interrupted.\n");
+    }
+    for (size_t i = 0; i < length; i++)
+    {
+        if (value[i] != p[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+//! equal with customized compare function
+template<typename Tp>
+bool data<Tp>::equals(const data &p, bool (*equal)(Tp, Tp)) const
+{
+    if (this == &p)
+    {
+        return true;
+    }
+    if (length != p.length)
+    {
+        return false;
+    }
+    if (value == NULL || value == nullptr || p.value == NULL || p.value == nullptr)
+    {
+        throw std::invalid_argument("Null Pointer Exception: The value pointer is null, assignment interrupted.\n");
+    }
+    for (size_t i = 0; i < length; i++)
+    {
+        if (!equal(value[i], p[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+//! destructor
+template<typename Tp>
+data<Tp>::~data()
+{
+    if (value == NULL || value == nullptr)
+    {
+        throw std::invalid_argument(
+                "Null Pointer Exception: The value pointer is null, data destruction interrupted.\n");
+    }
+    delete[] value;
+    value = nullptr;
+}
+
+#else
+
+//! constructor using the given source data
+template<typename Tp>
+data<Tp>::data(Tp *dat, size_t length)
+{
+    this->length = length;
+    this->value = dat;
+    this->ref_count = new int[1]{1};
+}
+
+//! constructor that malloc new memory of the given length
+template<typename Tp>
+data<Tp>::data(size_t length):length(length)
+{
+    value = new Tp[length];
+    ref_count = new int[1]{1};
+}
+
+//! soft copy constructor
+template<typename Tp>
+data<Tp>::data(const data &p)
+{
+    length = p.length;
+    delete[]value;
+    value = p.value;
+    delete[]ref_count;
+    ref_count = p.ref_count;
+}
+
+//! hard copy
+template<typename Tp>
+data<Tp> data<Tp>::clone()
+{
+    data<Tp> New(value, length);
+    New.ref_count = new size_t[1]{1};
+    return New;
+}
+
+template<typename Tp>
+bool data<Tp>::copy_to(data &dst)
+{
+    dst.~data();
+    dst = clone();
+    return true;
+}
+
+//! increase refcount
+template<typename Tp>
+void data<Tp>::inc_ref_count()
+{
+    (*ref_count)++;
+}
+
+//! decrease refcount
+template<typename Tp>
+void data<Tp>::dec_ref_count()
+{
+    (*ref_count)--;
+    if (!(*ref_count))
+    {
+        this->~data();
+    }
+}
+
+//! override []
 template<typename Tp>
 Tp &data<Tp>::operator[](size_t i) const
 {
     return value[i];
 }
 
+//! override assign operator
 template<typename Tp>
 data<Tp> &data<Tp>::operator=(const data &p)
 {
@@ -377,6 +319,7 @@ data<Tp> &data<Tp>::operator=(const data &p)
     return (*this);
 }
 
+//! override equation(strict equal)
 template<typename Tp>
 bool data<Tp>::operator==(const data &p) const
 {
@@ -398,6 +341,7 @@ bool data<Tp>::operator==(const data &p) const
     return true;
 }
 
+//! equal with customized compare function
 template<typename Tp>
 bool data<Tp>::equals(const data &p, bool (*equal)(Tp, Tp)) const
 {
@@ -417,6 +361,14 @@ bool data<Tp>::equals(const data &p, bool (*equal)(Tp, Tp)) const
         }
     }
     return true;
+}
+
+//! destructor
+template<typename Tp>
+data<Tp>::~data()
+{
+    delete[] value;
+    value = nullptr;
 }
 
 #endif
