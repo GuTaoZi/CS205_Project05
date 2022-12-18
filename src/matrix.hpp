@@ -1,22 +1,22 @@
 #pragma once
 
 #include <cstddef>
-#include <exception>
 #include <stdexcept>
 #include "iostream"
 #include "data.hpp"
+
+#define MAX_CHANNEL (4)
 
 template<typename Tp>
 class matrix
 {
 private:
     typedef matrix<bool> mask;
-    typedef char channel_number;
 
     size_t rows;
     size_t cols;
-    //number of channels should be [1,4]
-    channel_number channels;
+    //number of channels should be [1,MAX_CHANNEL]
+    size_t channels;
     //padding of relative position
     size_t channel_pad;
     size_t step;
@@ -24,10 +24,10 @@ private:
     data<Tp> *dat;
 public:
     //! constructor that sets matrix elements to given source data
-    matrix(size_t rows, size_t cols, Tp *src, channel_number channels = 1);
+    matrix(size_t rows, size_t cols, Tp *src, size_t channels = 1);
 
     //! constructor that sets each matrix element to specified value
-    matrix(size_t rows, size_t cols, const Tp &value, channel_number channels = 1);
+    matrix(size_t rows, size_t cols, const Tp &value, size_t channels = 1);
 
     //! submatrix constructor(ROI)
     matrix(matrix &src, size_t row1, size_t col1, size_t row2, size_t col2);
@@ -51,19 +51,19 @@ public:
     bool copy_to(matrix<Tp> &dst, const mask &mask);
 
     //! split out a single channel
-    matrix<Tp> split_channel(channel_number channel_id);
+    matrix<Tp> split_channel(size_t channel_id);
 
     //! get element from matrix (read only)
-    Tp at(size_t row, size_t col, channel_number channel = 1) const;
+    Tp at(size_t row, size_t col, size_t channel = 1) const;
 
     //! get element reference from matrix
-    Tp &operator()(size_t row, size_t col, channel_number channel = 1) const;
+    Tp &operator()(size_t row, size_t col, size_t channel = 1) const;
 
     //! set a single element to a given value
-    bool set(size_t row, size_t col, const Tp &value, channel_number channel = 1);
+    bool set(size_t row, size_t col, const Tp &value, size_t channel = 1);
 
     //! fill the given region with a given value
-    bool fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel = 1);
+    bool fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, size_t channel = 1);
 
     //! equal with customized compare function
     bool equals(const matrix<Tp> &p, bool (*equal)(Tp, Tp)) const;
@@ -103,6 +103,10 @@ public:
     template<typename result_type, typename T2>
     matrix<result_type> binary_calc(const matrix<T2> &p, result_type (*binary_function)(Tp, T2)) const;
 
+    //! override ostream
+    template<typename T>
+    friend std::ostream &operator<<(std::ostream &o, const matrix<T> &p);
+
     //! destructor
     ~matrix();
 
@@ -113,7 +117,7 @@ public:
 
     size_t get_cols() const;
 
-    channel_number get_channels() const;
+    size_t get_channels() const;
 
     size_t get_step() const;
 
@@ -125,18 +129,19 @@ public:
 };
 
 #ifdef SAFE
+
 //! constructor that sets matrix elements to given source data
 template<typename Tp>
-matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels):rows(rows), cols(cols),
+matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, size_t channels):rows(rows), cols(cols),
                                                                                channels(channels)
 {
     if (rows * cols == 0)
     {
         throw std::invalid_argument("Invalid Argument Exception: row number and column number should be positive.\n");
     }
-    if (channels > 4 || channels <= 0)
+    if (channels > MAX_CHANNEL || channels <= 0)
     {
-        throw std::invalid_argument("Invalid Argument Exception: channel number should be in [1,4].\n");
+        throw std::invalid_argument("Invalid Argument Exception: channel number should be in [1,MAX_CHANNEL].\n");
     }
     this->shift = 0;
     this->step = cols;
@@ -146,16 +151,16 @@ matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels):r
 
 //! constructor that sets each matrix element to specified value
 template<typename Tp>
-matrix<Tp>::matrix(size_t rows, size_t cols, const Tp &value, channel_number channels):rows(rows), cols(cols),
+matrix<Tp>::matrix(size_t rows, size_t cols, const Tp &value, size_t channels):rows(rows), cols(cols),
                                                                                        channels(channels)
 {
     if (rows * cols == 0)
     {
         throw std::invalid_argument("Invalid Argument Exception: row number and column number should be positive.\n");
     }
-    if (channels > 4 || channels <= 0)
+    if (channels > MAX_CHANNEL || channels <= 0)
     {
-        throw std::invalid_argument("Invalid Argument Exception: channel number should be in [1,4].\n");
+        throw std::invalid_argument("Invalid Argument Exception: channel number should be in [1,MAX_CHANNEL].\n");
     }
     size_t length = size();
     try
@@ -236,17 +241,17 @@ matrix<Tp> &matrix<Tp>::operator=(const matrix<Tp> &p)
     {
         throw std::invalid_argument("Null Pointer Exception: The data of source matrix is null.\n");
     }
-    rows = p.get_rows();
-    cols = p.get_cols();
-    channels = p.get_channels();
-    step = p.get_step();
-    shift = p.get_shift();
-    channel_pad = p.get_channel_pad();
-    if (dat != p.get_dat())
+    rows = p.rows;
+    cols = p.cols;
+    channels = p.channels;
+    step = p.step;
+    shift = p.shift;
+    channel_pad = p.channel_pad;
+    if (dat != p.dat)
     {
         dat->dec_ref_count();
     }
-    dat = p.get_dat();
+    dat = p.dat;
     dat->inc_ref_count();
 }
 
@@ -274,7 +279,7 @@ matrix<int> matrix<Tp>::clone()
     {
         Tp *NewArr = new Tp[size()]{};
         size_t it = 0;
-        for (channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -310,7 +315,7 @@ bool matrix<Tp>::copy_to(matrix<Tp> &dst, const matrix::mask &mask)
         dst.~matrix();
         Tp *NewArr = new Tp[size()]{};
         size_t it = 0;
-        for (channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -336,7 +341,7 @@ bool matrix<Tp>::copy_to(matrix<Tp> &dst, const matrix::mask &mask)
 
 //! split out a single channel
 template<typename Tp>
-matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
+matrix<Tp> matrix<Tp>::split_channel(size_t channel_id)
 {
     if (channel_id > channels || channel_id <= 0)
     {
@@ -351,31 +356,33 @@ matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
 
 //! get element from matrix (read only)
 template<typename Tp>
-Tp matrix<Tp>::at(size_t row, size_t col, channel_number channel) const
+Tp matrix<Tp>::at(size_t row, size_t col, size_t channel) const
 {
     if (row > rows || col > cols || channel > channels)
     {
         throw std::out_of_range(
                 "Out Of Range Exception: arguments should be in the range of source matrix.\n");
     }
-    return (*dat)[shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1];
+    int pos=(int)shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1;
+    return (*dat)[pos];
 }
 
 //! get element reference from matrix
 template<typename Tp>
-Tp &matrix<Tp>::operator()(size_t row, size_t col, channel_number channel) const
+Tp &matrix<Tp>::operator()(size_t row, size_t col, size_t channel) const
 {
     if (row > rows || col > cols || channel > channels)
     {
         throw std::out_of_range(
                 "Out Of Range Exception: arguments should be in the range of source matrix.\n");
     }
-    return (*dat)[shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1];
+    int pos=(int)shift + (channel - 1) * channel_pad + (row - 1) * step + col - 1;
+    return (*dat)[pos];
 }
 
 //! set a single element to a given value
 template<typename Tp>
-bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, matrix::channel_number channel)
+bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, size_t channel)
 {
     if (row > rows || col > cols || channel > channels)
     {
@@ -388,7 +395,7 @@ bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, matrix::channel_nu
 
 //! fill the given region with a given value
 template<typename Tp>
-bool matrix<Tp>::fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel)
+bool matrix<Tp>::fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, size_t channel)
 {
     if (row1 > row2 || col1 > col2)
     {
@@ -424,7 +431,7 @@ bool matrix<Tp>::equals(const matrix<Tp> &p, bool (*equal)(Tp, Tp)) const
     {
         return false;
     }
-    for (channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -452,7 +459,7 @@ bool matrix<Tp>::operator==(const matrix &p) const
     {
         return false;
     }
-    for (channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -477,7 +484,7 @@ matrix<target_type> matrix<Tp>::convert_to(target_type (*convert_function)(Tp sr
     {
         target_type *NewArr = new target_type[size()]{};
         size_t it = 0;
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -504,7 +511,7 @@ matrix<Tp> matrix<Tp>::transpose()
     {
         Tp *NewArr = new Tp[size()]{};
         size_t it = 0;
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t c = 1; c <= cols; c++)
             {
@@ -527,12 +534,17 @@ template<typename T1>
 template<typename T2>
 matrix<decltype(T1() + T2())> matrix<T1>::operator+(matrix<T2> &p)
 {
+    if(cols!=p.get_cols()||rows!=p.get_rows()||channels!=p.get_channels())
+    {
+        throw std::invalid_argument(
+                "Invalid Argument Exception: The size and channel number of two matrix should be the same.\n");
+    }
     try
     {
         typedef decltype(T1() + T2()) result_type;
         result_type *NewArr = new result_type[size()]{};
         size_t it = 0;
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -555,12 +567,17 @@ template<typename T1>
 template<typename T2>
 matrix<decltype(T1() - T2())> matrix<T1>::operator-(matrix<T2> &p)
 {
+    if(cols!=p.get_cols()||rows!=p.get_rows()||channels!=p.get_channels())
+    {
+        throw std::invalid_argument(
+                "Invalid Argument Exception: The size and channel number of two matrix should be the same.\n");
+    }
     try
     {
         typedef decltype(T1() - T2()) result_type;
         result_type *NewArr = new result_type[size()]{};
         size_t it = 0;
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -583,12 +600,22 @@ template<typename T1>
 template<typename T2>
 matrix<decltype(T1() * T2())> matrix<T1>::operator*(matrix<T2> &p)
 {
+    if (cols != p.get_rows() )
+    {
+        throw std::invalid_argument(
+                "Invalid Argument Exception: The col number of left matrix should equal the row number of right matrix.\n");
+    }
+    if(channels != p.get_channels())
+    {
+        throw std::invalid_argument(
+                "Invalid Argument Exception: The channel number of two matrix should be the same.\n");
+    }
     try
     {
         typedef decltype(T1() * T2()) result_type;
-        result_type *NewArr = new result_type[size()]{};
-        matrix<result_type> New(rows, cols, NewArr, channels);
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        auto *NewArr = new result_type[rows * p.get_cols() * channels]{};
+        matrix<result_type> New(rows, p.get_cols(), NewArr, channels);
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t i = 1; i <= rows; i++)
             {
@@ -596,7 +623,7 @@ matrix<decltype(T1() * T2())> matrix<T1>::operator*(matrix<T2> &p)
                 {
                     for (size_t j = 1; j <= p.get_cols(); j++)
                     {
-                        New(i, j) = New(i, j) + at(i, k) * p.at(k, j);
+                        New(i, j, ch) = New.at(i, j, ch) + at(i, k, ch) * p.at(k, j, ch);
                     }
                 }
             }
@@ -652,7 +679,7 @@ matrix<result_type> matrix<Tp>::unary_calc(result_type (*unary_function)(Tp)) co
     {
         result_type *NewArr = new result_type[size()]{};
         size_t it = 0;
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -675,11 +702,16 @@ template<typename Tp>
 template<typename result_type, typename T2>
 matrix<result_type> matrix<Tp>::binary_calc(const matrix<T2> &p, result_type (*binary_function)(Tp, T2)) const
 {
+    if(cols!=p.get_cols()||rows!=p.get_rows()||channels!=p.get_channels())
+    {
+        throw std::invalid_argument(
+                "Invalid Argument Exception: The size and channel number of two matrix should be the same.\n");
+    }
     try
     {
         result_type *NewArr = new result_type[size()]{};
         size_t it = 0;
-        for (matrix::channel_number ch = 1; ch <= channels; ch++)
+        for (size_t ch = 1; ch <= channels; ch++)
         {
             for (size_t r = 1; r <= rows; r++)
             {
@@ -696,6 +728,65 @@ matrix<result_type> matrix<Tp>::binary_calc(const matrix<T2> &p, result_type (*b
         std::cerr << "Bad Alloc Exception: Failed to allocate memory of the given length " << size() << "\n";
         throw std::bad_alloc();
     }
+}
+
+//! override ostream
+template<typename Tp>
+std::ostream &operator<<(std::ostream &o, const matrix<Tp> &p)
+{
+    if (p.channels == 1)
+    {
+        o << '[';
+        for (size_t i = 1; i < p.rows; i++)
+        {
+            for (size_t j = 1; j < p.cols; j++)
+            {
+                o << p.at(i, j) << ",\t";
+            }
+            o << p.at(i, p.cols) << ";\n";
+        }
+        for (size_t j = 1; j < p.cols; j++)
+        {
+            o << p.at(p.rows, j) << ",\t";
+        }
+        o << p.at(p.rows, p.cols) << ']';
+    }
+    else
+    {
+        o << '{';
+        for (size_t ch = 1; ch < p.channels; ch++)
+        {
+            o << '[';
+            for (size_t i = 1; i < p.rows; i++)
+            {
+                for (size_t j = 1; j < p.cols; j++)
+                {
+                    o << p.at(i, j, ch) << ",\t";
+                }
+                o << p.at(i, p.cols, ch) << ";\n";
+            }
+            for (size_t j = 1; j < p.cols; j++)
+            {
+                o << p.at(p.rows, j, ch) << ",\t";
+            }
+            o << p.at(p.rows, p.cols, ch) << "]\n";
+        }
+        o << '[';
+        for (size_t i = 1; i < p.rows; i++)
+        {
+            for (size_t j = 1; j < p.cols; j++)
+            {
+                o << p.at(i, j, p.channels) << ",\t";
+            }
+            o << p.at(i, p.cols, p.channels) << ";\n";
+        }
+        for (size_t j = 1; j < p.cols; j++)
+        {
+            o << p.at(p.rows, j, p.channels) << ",\t";
+        }
+        o << p.at(p.rows, p.cols, p.channels) << "]}";
+    }
+    return o;
 }
 
 //! destructor
@@ -725,7 +816,7 @@ size_t matrix<Tp>::get_cols() const
 }
 
 template<typename Tp>
-char matrix<Tp>::get_channels() const
+size_t matrix<Tp>::get_channels() const
 {
     return channels;
 }
@@ -758,14 +849,14 @@ data<Tp> *matrix<Tp>::get_dat() const
 
 //! constructor that sets matrix elements to given source data
 template<typename Tp>
-matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels):rows(rows), cols(cols),
+matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, size_t channels):rows(rows), cols(cols),
                                                                                channels(channels)
 {
     if (rows * cols == 0)
     {
         return;
     }
-    if (channels > 4 || channels <= 0)
+    if (channels > MAX_CHANNEL || channels <= 0)
     {
         return;
     }
@@ -777,14 +868,14 @@ matrix<Tp>::matrix(size_t rows, size_t cols, Tp *src, channel_number channels):r
 
 //! constructor that sets each matrix element to specified value
 template<typename Tp>
-matrix<Tp>::matrix(size_t rows, size_t cols, const Tp &value, channel_number channels):rows(rows), cols(cols),
+matrix<Tp>::matrix(size_t rows, size_t cols, const Tp &value, size_t channels):rows(rows), cols(cols),
                                                                                        channels(channels)
 {
     if (rows * cols == 0)
     {
         return;
     }
-    if (channels > 4 || channels <= 0)
+    if (channels > MAX_CHANNEL || channels <= 0)
     {
         return;
     }
@@ -870,7 +961,7 @@ matrix<int> matrix<Tp>::clone()
 {
     Tp *NewArr = new Tp[size()]{};
     size_t it = 0;
-    for (channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -898,17 +989,17 @@ bool matrix<Tp>::copy_to(matrix &dst, const matrix::mask &mask)
     dst.~matrix();
     Tp *NewArr = new Tp[size()]{};
     size_t it = 0;
-    for (channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
             for (size_t c = 1; c <= cols; c++)
             {
-                it++;
                 if (mask(r, c, ch))
                 {
                     NewArr[it] = at(r, c, ch);
                 }
+                it++;
             }
         }
     }
@@ -918,7 +1009,7 @@ bool matrix<Tp>::copy_to(matrix &dst, const matrix::mask &mask)
 
 //! split out a single channel
 template<typename Tp>
-matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
+matrix<Tp> matrix<Tp>::split_channel(size_t channel_id)
 {
     if (channel_id <= 0 || channel_id > channels)
     {
@@ -933,7 +1024,7 @@ matrix<Tp> matrix<Tp>::split_channel(matrix::channel_number channel_id)
 
 //! get element from matrix (read only)
 template<typename Tp>
-Tp matrix<Tp>::at(size_t row, size_t col, channel_number channel) const
+Tp matrix<Tp>::at(size_t row, size_t col, size_t channel) const
 {
     if (row > rows || col > cols || channel > channels)
     {
@@ -945,7 +1036,7 @@ Tp matrix<Tp>::at(size_t row, size_t col, channel_number channel) const
 
 //! get element reference from matrix
 template<typename Tp>
-Tp &matrix<Tp>::operator()(size_t row, size_t col, channel_number channel) const
+Tp &matrix<Tp>::operator()(size_t row, size_t col, size_t channel) const
 {
     if (row > rows || col > cols || channel > channels)
     {
@@ -957,7 +1048,7 @@ Tp &matrix<Tp>::operator()(size_t row, size_t col, channel_number channel) const
 
 //! set a single element to a given value
 template<typename Tp>
-bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, matrix::channel_number channel)
+bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, size_t channel)
 {
     if (row > rows || col > cols || channel > channels)
     {
@@ -970,7 +1061,7 @@ bool matrix<Tp>::set(size_t row, size_t col, const Tp &value, matrix::channel_nu
 
 //! fill the given region with a given value
 template<typename Tp>
-bool matrix<Tp>::fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, channel_number channel)
+bool matrix<Tp>::fill(size_t row1, size_t col1, size_t row2, size_t col2, const Tp &value, size_t channel)
 {
     if (row1 > row2 || col1 > col2 || row1 * row2 == 0 || row2 > rows || col2 > cols)
     {
@@ -999,7 +1090,7 @@ bool matrix<Tp>::equals(const matrix &p, bool (*equal)(Tp, Tp)) const
     {
         return false;
     }
-    for (channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1027,7 +1118,7 @@ bool matrix<Tp>::operator==(const matrix &p) const
     {
         return false;
     }
-    for (channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1050,7 +1141,7 @@ matrix<target_type> matrix<Tp>::convert_to(target_type (*convert_function)(Tp sr
 {
     target_type *NewArr = new target_type[size()]{};
     size_t it = 0;
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1069,7 +1160,7 @@ matrix<Tp> matrix<Tp>::transpose()
 {
     Tp *NewArr = new Tp[size()]{};
     size_t it = 0;
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t c = 1; c <= cols; c++)
         {
@@ -1086,10 +1177,15 @@ template<typename T1>
 template<typename T2>
 matrix<decltype(T1() + T2())> matrix<T1>::operator+(matrix<T2> &p)
 {
+    if (cols != p.get_cols() || rows != p.get_rows() || channels != p.get_channels())
+    {
+        std::cerr << "Invalid Argument Exception: The size and channel number of two matrix should be the same.\n";
+        abort();
+    }
     typedef decltype(T1() + T2()) result_type;
     result_type *NewArr = new result_type[size()]{};
     size_t it = 0;
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1106,10 +1202,15 @@ template<typename T1>
 template<typename T2>
 matrix<decltype(T1() - T2())> matrix<T1>::operator-(matrix<T2> &p)
 {
+    if (cols != p.get_cols() || rows != p.get_rows() || channels != p.get_channels())
+    {
+        std::cerr << "Invalid Argument Exception: The size and channel number of two matrix should be the same.\n";
+        abort();
+    }
     typedef decltype(T1() - T2()) result_type;
     result_type *NewArr = new result_type[size()]{};
     size_t it = 0;
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1126,10 +1227,21 @@ template<typename T1>
 template<typename T2>
 matrix<decltype(T1() * T2())> matrix<T1>::operator*(matrix<T2> &p)
 {
+    if (cols != p.get_rows())
+    {
+        std::cerr
+                << "Invalid Argument Exception: The col number of left matrix should equal the row number of right matrix.\n";
+        abort();
+    }
+    if (channels != p.get_channels())
+    {
+        std::cerr << "Invalid Argument Exception: The channel number of two matrix should be the same.\n";
+        abort();
+    }
     typedef decltype(T1() * T2()) result_type;
-    result_type *NewArr = new result_type[size()]{};
-    matrix<result_type> New(rows, cols, NewArr, channels);
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    result_type *NewArr = new result_type[rows*p.get_cols()*channels]{};
+    matrix<result_type> New(rows, p.get_cols(), NewArr, channels);
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t i = 1; i <= rows; i++)
         {
@@ -1137,7 +1249,7 @@ matrix<decltype(T1() * T2())> matrix<T1>::operator*(matrix<T2> &p)
             {
                 for (size_t j = 1; j <= p.get_cols(); j++)
                 {
-                    New(i, j) = New(i, j) + at(i, k) * p.at(k, j);
+                    New(i, j, ch) = New(i, j, ch) + at(i, k, ch) * p.at(k, j, ch);
                 }
             }
         }
@@ -1185,7 +1297,7 @@ matrix<result_type> matrix<Tp>::unary_calc(result_type (*unary_function)(Tp)) co
 {
     result_type *NewArr = new result_type[size()]{};
     size_t it = 0;
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1202,9 +1314,14 @@ template<typename Tp>
 template<typename result_type, typename T2>
 matrix<result_type> matrix<Tp>::binary_calc(const matrix<T2> &p, result_type (*binary_function)(Tp, T2)) const
 {
+    if (cols != p.get_cols() || rows != p.get_rows() || channels != p.get_channels())
+    {
+        std::cerr << "Invalid Argument Exception: The size and channel number of two matrix should be the same.\n";
+        abort();
+    }
     result_type *NewArr = new result_type[size()]{};
     size_t it = 0;
-    for (matrix::channel_number ch = 1; ch <= channels; ch++)
+    for (size_t ch = 1; ch <= channels; ch++)
     {
         for (size_t r = 1; r <= rows; r++)
         {
@@ -1215,6 +1332,66 @@ matrix<result_type> matrix<Tp>::binary_calc(const matrix<T2> &p, result_type (*b
         }
     }
     return matrix<result_type>(rows, cols, NewArr, channels);
+}
+
+
+//! override ostream
+template<typename Tp>
+std::ostream &operator<<(std::ostream &o, const matrix<Tp> &p)
+{
+    if (p.channels == 1)
+    {
+        o << '[';
+        for (size_t i = 1; i < p.rows; i++)
+        {
+            for (size_t j = 1; j < p.cols; j++)
+            {
+                o << p.at(i, j) << ",\t";
+            }
+            o << p.at(i, p.cols) << ";\n";
+        }
+        for (size_t j = 1; j < p.cols; j++)
+        {
+            o << p.at(p.rows, j) << ",\t";
+        }
+        o << p.at(p.rows, p.cols) << ']';
+    }
+    else
+    {
+        o << '{';
+        for (size_t ch = 1; ch < p.channels; ch++)
+        {
+            o << '[';
+            for (size_t i = 1; i < p.rows; i++)
+            {
+                for (size_t j = 1; j < p.cols; j++)
+                {
+                    o << p.at(i, j, ch) << ",\t";
+                }
+                o << p.at(i, p.cols, ch) << ";\n";
+            }
+            for (size_t j = 1; j < p.cols; j++)
+            {
+                o << p.at(p.rows, j, ch) << ",\t";
+            }
+            o << p.at(p.rows, p.cols, ch) << "]\n";
+        }
+        o << '[';
+        for (size_t i = 1; i < p.rows; i++)
+        {
+            for (size_t j = 1; j < p.cols; j++)
+            {
+                o << p.at(i, j, p.channels) << ",\t";
+            }
+            o << p.at(i, p.cols, p.channels) << ";\n";
+        }
+        for (size_t j = 1; j < p.cols; j++)
+        {
+            o << p.at(p.rows, j, p.channels) << ",\t";
+        }
+        o << p.at(p.rows, p.cols, p.channels) << "]}";
+    }
+    return o;
 }
 
 //! destructor
@@ -1244,7 +1421,7 @@ size_t matrix<Tp>::get_cols() const
 }
 
 template<typename Tp>
-char matrix<Tp>::get_channels() const
+size_t matrix<Tp>::get_channels() const
 {
     return channels;
 }

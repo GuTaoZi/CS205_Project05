@@ -153,30 +153,6 @@ src/benchmark.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/mat.dir/build.make CMakeFiles/mat.dir/src/benchmark.cpp.s
 .PHONY : src/benchmark.cpp.s
 
-src/matrix_impl.o: src/matrix_impl.cpp.o
-.PHONY : src/matrix_impl.o
-
-# target to build an object file
-src/matrix_impl.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mat.dir/build.make CMakeFiles/mat.dir/src/matrix_impl.cpp.o
-.PHONY : src/matrix_impl.cpp.o
-
-src/matrix_impl.i: src/matrix_impl.cpp.i
-.PHONY : src/matrix_impl.i
-
-# target to preprocess a source file
-src/matrix_impl.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mat.dir/build.make CMakeFiles/mat.dir/src/matrix_impl.cpp.i
-.PHONY : src/matrix_impl.cpp.i
-
-src/matrix_impl.s: src/matrix_impl.cpp.s
-.PHONY : src/matrix_impl.s
-
-# target to generate assembly for a file
-src/matrix_impl.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mat.dir/build.make CMakeFiles/mat.dir/src/matrix_impl.cpp.s
-.PHONY : src/matrix_impl.cpp.s
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -189,9 +165,6 @@ help:
 	@echo "... src/benchmark.o"
 	@echo "... src/benchmark.i"
 	@echo "... src/benchmark.s"
-	@echo "... src/matrix_impl.o"
-	@echo "... src/matrix_impl.i"
-	@echo "... src/matrix_impl.s"
 .PHONY : help
 
 

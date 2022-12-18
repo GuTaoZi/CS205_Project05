@@ -13,8 +13,8 @@ class data
 {
 private:
     Tp *value;
-    size_t length{};
-    int *ref_count{};
+    size_t length;
+    size_t *ref_count;
 public:
     //! constructor using the given source data
     explicit data(Tp *dat, size_t length);
@@ -241,7 +241,7 @@ data<Tp>::data(Tp *dat, size_t length)
 {
     this->length = length;
     this->value = dat;
-    this->ref_count = new int[1]{1};
+    this->ref_count = new size_t[1]{1};
 }
 
 //! constructor that malloc new memory of the given length
@@ -249,7 +249,7 @@ template<typename Tp>
 data<Tp>::data(size_t length):length(length)
 {
     value = new Tp[length];
-    ref_count = new int[1]{1};
+    ref_count = new size_t[1]{1};
 }
 
 //! soft copy constructor

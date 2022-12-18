@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/mnt/e/Cpp/Project05/./inc
+CXX_INCLUDES = 
 
 CXX_FLAGS = 
 
