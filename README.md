@@ -10,8 +10,24 @@
 
 ### 项目结构
 
+```cpp
+E:\CPP\PROJECT05
+│  CMakeLists.txt
+│  README.md
+│
+├─build
+│      //makefile here
+│
+├─doc
+│      Report.pdf
+│
+└─src
+        benchmark.cpp
+        data.hpp
+        matrix.hpp
 ```
-```
+
+*编译时添加选项 -DSAFE 可以调用严格版函数实现。
 
 ## Part 1 - Analysis
 
